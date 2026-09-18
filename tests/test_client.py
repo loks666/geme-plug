@@ -20,8 +20,8 @@ def test_normalize_mac_rejects_invalid(value):
 
 def test_default_topics():
     plug = SmartPlug(host="127.0.0.1", mac="AA:BB:CC:DD:EE:FF")
-    assert plug.publish_topic == "/geme/aabbccddeeff/publish"
-    assert plug.subscribe_topic == "/geme/aabbccddeeff/subscribe"
+    assert plug.publish_topic == "request"
+    assert plug.subscribe_topic == "response"
 
 
 def test_custom_topics():

@@ -60,11 +60,10 @@ class SmartPlug:
         self.password = password
         self.timeout = float(timeout)
 
-        # GemeOpen's configuration labels are counterintuitive in practice:
-        # the plug subscribes to the topic ending in /publish for commands and
-        # publishes responses to the topic ending in /subscribe.
-        self.publish_topic = publish_topic or f"/geme/{self.mac}/publish"
-        self.subscribe_topic = subscribe_topic or f"/geme/{self.mac}/subscribe"
+        # The SDK publishes commands to the topic subscribed to by the device,
+        # and subscribes to the topic used by the device for responses.
+        self.publish_topic = publish_topic or "request"
+        self.subscribe_topic = subscribe_topic or "response"
         self.client_id = client_id or f"geme-plug-{self.mac}-{uuid.uuid4().hex[:8]}"
 
         self._connected = threading.Event()
