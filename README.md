@@ -58,6 +58,33 @@ plug = SmartPlug(
 
 `port` 默认是 `1883`。
 
+## 使用 Docker Compose 启动 EMQX
+
+仓库内置了与以下 `docker run` 配置等价的 `compose.yaml`：
+
+```bash
+docker compose up -d
+```
+
+- MQTT Broker：`mqtt://<本机局域网 IP>:1883`
+- EMQX Dashboard：`http://127.0.0.1:18083`
+
+设备必须连接到运行 EMQX 的电脑的局域网 IP，不能使用设备视角下的
+`127.0.0.1`。EMQX Dashboard 的初始登录信息请以当前镜像的启动页提示为准，
+首次登录后应立即修改密码。
+
+## 关断测试
+
+确认设备已经连到该 Broker 后，可运行：
+
+```bash
+python examples/turn_off.py \
+  --host <运行 EMQX 的局域网 IP> \
+  --mac <插座 MAC 地址>
+```
+
+脚本先查询当前状态，再发布关断指令，最后重新查询并验证设备报告为关闭。
+
 ## 设备 MQTT 配置
 
 在使用 SDK 前，插座必须已经：
