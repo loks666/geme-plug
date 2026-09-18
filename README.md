@@ -1,136 +1,302 @@
 # geme-plug
 
-`geme-plug` 是一个用于 **GemeOpen / GeekOpen GSPM1B 智能插座** 的 Python MQTT SDK，面向自建 MQTT Broker（例如 EMQX）。
+`geme-plug` 是一个用于 GemeOpen / GeekOpen GSPM1B 智能插座的 Python MQTT SDK，支持：
 
-> 本项目是第三方开源 SDK，与 GemeOpen / 武汉智鸟科技无隶属关系。
+- 打开、关闭插座；
+- 查询开关状态和设备信息；
+- 查询电压、电流、功率和累计电量；
+- 连接启用账号认证的 EMQX 等 MQTT Broker；
+- 自定义 MQTT 发布和订阅主题。
 
-## 安装
+> 本项目是第三方开源 SDK，与 GemeOpen 或设备厂商没有隶属关系。
 
-```bash
-pip install geme-plug
+## 新环境快速开始
+
+下面以 Windows PowerShell 为例。新电脑不需要先安装本仓库源码，只要有 Python 3.10 以上版本并且能够访问 MQTT Broker 即可。
+
+### 第一步：创建独立目录和虚拟环境
+
+```powershell
+mkdir geme-plug-test
+cd geme-plug-test
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip
 ```
 
-## 快速开始
+如果 PowerShell 禁止运行激活脚本，也可以不激活环境，后续始终使用 `.\.venv\Scripts\python.exe`。
+
+### 第二步：从 PyPI 安装 SDK
+
+```powershell
+python -m pip install geme-plug
+python -c "import geme_plug; print(geme_plug.__version__)"
+```
+
+不激活环境时使用：
+
+```powershell
+.\.venv\Scripts\python.exe -m pip install geme-plug
+```
+
+### 第三步：确认连接参数
+
+运行代码前需要准备：
+
+- EMQX 的 IP 和 MQTT 端口；
+- MQTT 用户名和密码；
+- 插座 MAC 地址；
+- 设备实际使用的发布和订阅主题。
+
+SDK 与 EMQX 在同一台电脑上运行时，`host` 使用 `127.0.0.1`。SDK 在其他电脑运行时，`host` 使用 EMQX 所在电脑的局域网 IP。
+
+当前已测试设备的主题方向是：SDK 向 `response` 发布命令，从 `request` 接收设备数据。
+
+### 第四步：创建测试文件
+
+新建 `test_plug.py`：
 
 ```python
 from geme_plug import SmartPlug
 
 plug = SmartPlug(
-    host="192.168.31.100",   # EMQX Broker IP / hostname
-    mac="AABBCCDDEEFF",
+    host="127.0.0.1",               # 或 EMQX 所在电脑的局域网 IP
+    port=1883,
+    username="<MQTT_USERNAME>",
+    password="<MQTT_PASSWORD>",
+    mac="8CCE4E51ACAB",
+    publish_topic="response",       # SDK -> 设备
+    subscribe_topic="request",      # 设备 -> SDK
 )
 
 plug.connect()
 
-plug.turn_on()
-plug.turn_off()
+try:
+    status = plug.get_status()
+    print("开关状态:", "打开" if status.is_on else "关闭")
 
-print(plug.get_status())
-print(plug.get_power())
-
-plug.disconnect()
+    power = plug.get_power()
+    print("功率:", power.power, "W")
+    print("电流:", power.current, "A")
+finally:
+    plug.disconnect()
 ```
 
-也支持上下文管理器：
+### 第五步：运行
+
+```powershell
+python .\test_plug.py
+```
+
+不激活环境时：
+
+```powershell
+.\.venv\Scripts\python.exe .\test_plug.py
+```
+
+如果能输出开关状态、功率和电流，说明 Python 环境、PyPI 包、EMQX、认证信息及 MQTT 主题均已配置正确。需要控制插座时，再调用 `plug.turn_on()` 或 `plug.turn_off()`。
+
+## 1. 环境要求
+
+- Python 3.10 或更高版本；
+- 可用的 MQTT Broker，例如 EMQX；
+- 插座与运行 SDK 的电脑能够访问同一个 Broker；
+- 插座已经完成 Wi-Fi 和自定义 MQTT 配置。
+
+## 2. 创建虚拟环境
+
+Windows PowerShell：
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip
+```
+
+如果项目中已经存在 `.venv`，只需激活：
+
+```powershell
+.\.venv\Scripts\Activate.ps1
+```
+
+`.venv` 是普通 Python 虚拟环境，可以通过 `pip` 安装软件包。也可以不激活环境，直接指定解释器：
+
+```powershell
+.\.venv\Scripts\python.exe -m pip install <包名>
+```
+
+## 3. 安装 geme-plug
+
+从 PyPI 安装：
+
+```powershell
+python -m pip install --upgrade geme-plug
+```
+
+不激活虚拟环境时：
+
+```powershell
+.\.venv\Scripts\python.exe -m pip install --upgrade geme-plug
+```
+
+检查安装版本：
+
+```powershell
+python -c "import geme_plug; print(geme_plug.__version__)"
+```
+
+当前 PyPI 包名为 `geme-plug`，Python 导入名为 `geme_plug`。
+
+## 4. 启动 EMQX
+
+仓库提供了 `compose.yaml`：
+
+```powershell
+docker compose up -d
+docker compose ps
+```
+
+默认端口：
+
+- MQTT：`1883`
+- EMQX Dashboard：`18083`
+
+在运行 Docker 的同一台电脑上测试 SDK 时，Broker 地址可使用 `127.0.0.1`。插座和局域网内其他电脑连接 Broker 时，应使用运行 EMQX 的电脑的局域网 IP，不能使用它们自身的 `127.0.0.1`。
+
+查看设备是否已连接：
+
+```powershell
+docker exec emqx emqx ctl clients list
+```
+
+查看最近日志：
+
+```powershell
+docker compose logs --tail 100 emqx
+```
+
+## 5. MQTT 账号和主题
+
+SDK 与插座必须使用同一个 Broker、端口和 MQTT 账号。账号密码以 `compose.yaml` 中的实际配置为准：
+
+```python
+username="<MQTT_USERNAME>"
+password="<MQTT_PASSWORD>"
+```
+
+当前设备 `8CCE4E51ACAB` 已实测使用以下主题方向：
+
+| 方向 | 主题 |
+| --- | --- |
+| SDK 发布命令 | `response` |
+| SDK 订阅设备数据 | `request` |
+| 设备订阅命令 | `response` |
+| 设备发布数据 | `request` |
+
+因此，在当前环境中必须显式传入：
+
+```python
+publish_topic="response"
+subscribe_topic="request"
+```
+
+`publish_topic` 和 `subscribe_topic` 始终从 SDK 视角命名：
+
+- `publish_topic`：SDK 向设备发送命令的主题；
+- `subscribe_topic`：SDK 接收设备响应的主题。
+
+如果其他设备的自定义 MQTT 页面使用不同主题，请按设备的实际配置修改。可以通过下面的命令查看设备当前订阅的主题：
+
+```powershell
+docker exec emqx emqx ctl subscriptions list
+```
+
+## 6. 当前环境完整示例
+
+将账号和密码替换为 `compose.yaml` 中的值：
 
 ```python
 from geme_plug import SmartPlug
 
-with SmartPlug(host="192.168.31.100", mac="AA:BB:CC:DD:EE:FF") as plug:
+plug = SmartPlug(
+    host="127.0.0.1",
+    port=1883,
+    username="<MQTT_USERNAME>",
+    password="<MQTT_PASSWORD>",
+    mac="8CCE4E51ACAB",
+    publish_topic="response",
+    subscribe_topic="request",
+)
+
+plug.connect()
+
+try:
     plug.turn_on()
-    print(plug.get_power())
+    print("已打开")
+
+    status = plug.get_status()
+    print("开关状态:", "打开" if status.is_on else "关闭")
+
+    power = plug.get_power()
+    print("电压:", power.voltage, "V")
+    print("电流:", power.current, "A")
+    print("功率:", power.power, "W")
+    print("累计电量:", power.energy, "kWh")
+finally:
+    plug.turn_off()
+    print("已关闭")
+    plug.disconnect()
 ```
 
-## EMQX 认证
+这里使用 `finally`，确保状态或功率查询异常时仍会尝试关闭插座并断开连接。
 
-仓库中的 Compose 配置默认启用 MQTT 客户端认证，并内置以下局域网设备账号：
-
-```text
-用户名：geme-plug
-密码：x7Tq9V2mK8rP4nD6sH3wF5cJ1bL0zQeA
-```
-
-SDK 和设备配网页都要使用相同的账号：
+## 7. 只查询状态和功率
 
 ```python
+from geme_plug import SmartPlug
+
 plug = SmartPlug(
-    host="192.168.31.100",
-    mac="AABBCCDDEEFF",
-    username="geme-plug",
-    password="x7Tq9V2mK8rP4nD6sH3wF5cJ1bL0zQeA",
+    host="127.0.0.1",
+    port=1883,
+    username="<MQTT_USERNAME>",
+    password="<MQTT_PASSWORD>",
+    mac="8CCE4E51ACAB",
+    publish_topic="response",
+    subscribe_topic="request",
 )
+
+plug.connect()
+
+try:
+    status = plug.get_status()
+    print("开关状态:", "打开" if status.is_on else "关闭")
+
+    power = plug.get_power()
+    print("功率:", power.power, "W")
+    print("电流:", power.current, "A")
+finally:
+    plug.disconnect()
 ```
 
-`port` 默认是 `1883`。
+## 8. 使用 Jupyter Notebook 测试
 
-## 使用 Docker Compose 启动 EMQX
+仓库中的 `test_switch.ipynb` 已按当前环境配置好连接、开关、状态和功率测试。
 
-仓库内置了 EMQX Compose 配置，包含账号密码认证和持久化数据卷：
+在 VS Code 或其他支持 Notebook 的 IDE 中：
 
-```bash
-docker compose up -d
+1. 打开 `test_switch.ipynb`；
+2. 选择解释器 `.venv\Scripts\python.exe`；
+3. 从上到下依次运行单元格。
+
+如果 IDE 提示缺少 Notebook 内核，可安装：
+
+```powershell
+.\.venv\Scripts\python.exe -m pip install ipykernel
 ```
 
-- MQTT Broker：`mqtt://<本机局域网 IP>:1883`
-- EMQX Dashboard：`http://127.0.0.1:18083`
+## 9. API 说明
 
-设备必须连接到运行 EMQX 的电脑的局域网 IP，不能使用设备视角下的
-`127.0.0.1`。EMQX Dashboard 的初始登录信息请以当前镜像的启动页提示为准，
-首次登录后应立即修改密码。
-
-## 关断测试
-
-确认设备已经连到该 Broker 后，可运行：
-
-```bash
-python examples/turn_off.py \
-  --host <运行 EMQX 的局域网 IP> \
-  --mac <插座 MAC 地址>
-```
-
-脚本先查询当前状态，再发布关断指令，最后重新查询并验证设备报告为关闭。
-
-## 设备 MQTT 配置
-
-在使用 SDK 前，插座必须已经：
-
-1. 完成 2.4 GHz Wi-Fi 配网；
-2. 配置为连接你的 MQTT Broker / EMQX；
-3. 配置与 SDK 一致的 MQTT Topic。
-
-`geme-plug` 默认使用两个简洁的 Topic：
-
-```text
-request
-response
-```
-
-- SDK 向 `request` 发布控制指令，设备订阅该主题；
-- SDK 订阅 `response`，设备通过该主题返回状态和电量数据。
-
-在 GemeOpen 的“自定义 MQTT”页面中填写：
-
-- 订阅主题：`request`
-- 发布主题：`response`
-
-设备配置页的字段名称与 SDK 视角相反：SDK 的 `publish_topic` 对应设备的
-“订阅主题”，SDK 的 `subscribe_topic` 对应设备的“发布主题”。如果同一个
-Broker 连接多台设备，应为每台设备设置独立 Topic，避免消息互相干扰。
-
-如果你已经给设备配置了其他 Topic，可以显式覆盖：
-
-```python
-plug = SmartPlug(
-    host="192.168.31.100",
-    mac="AABBCCDDEEFF",
-    publish_topic="my/device/command",
-    subscribe_topic="my/device/state",
-)
-```
-
-## API
-
-### `SmartPlug(...)`
+### 创建客户端
 
 ```python
 SmartPlug(
@@ -146,64 +312,93 @@ SmartPlug(
 )
 ```
 
-MAC 可以使用以下任意格式：
+MAC 地址支持以下格式：
 
 ```text
-AABBCCDDEEFF
-AA:BB:CC:DD:EE:FF
-AA-BB-CC-DD-EE-FF
+8CCE4E51ACAB
+8C:CE:4E:51:AC:AB
+8C-CE-4E-51-AC-AB
 ```
 
-SDK 内部统一规范化为 `aabbccddeeff`。
+### 控制开关
 
-### `connect()` / `disconnect()`
-
-连接或断开 MQTT Broker。
-
-### `turn_on()` / `turn_off()`
-
-控制插座通断电。SDK 根据 GSPM1B 协议发送：
-
-```json
-{"type":"event","key":1}
+```python
+plug.turn_on()
+plug.turn_off()
 ```
 
-或：
+### 查询状态
 
-```json
-{"type":"event","key":0}
+```python
+status = plug.get_status()
+print(status.is_on)
+print(status.mac)
+print(status.ip)
+print(status.signal)
 ```
 
-### `get_status()`
+`get_status()` 返回 `PlugStatus`。
 
-查询设备状态，返回 `PlugStatus`，常用字段包括：
+### 查询功率
 
-- `mac`
-- `device_type`
-- `version`
-- `key` / `is_on`
-- `signal`
-- `ip`
-- `ssid`
-- `wifi_lock`
-- `key_lock`
-- `on_state`
-- `timer_enable`
-- `timer_interval`
+```python
+power = plug.get_power()
+print(power.voltage)
+print(power.current)
+print(power.power)
+print(power.energy)
+```
 
-### `get_power()`
+`get_power()` 返回 `PowerStatus`。
 
-查询电量数据，返回 `PowerStatus`：
+## 10. 常见问题
 
-- `voltage`：V
-- `current`：A
-- `power`：W
-- `energy`：kWh
-- `key` / `is_on`
+### `ModuleNotFoundError: No module named 'geme_plug'`
 
-## 说明
+通常是 IDE 选择了错误的 Python 解释器。确认使用：
 
-本版本聚焦于最基础、稳定的控制能力：连接 Broker、通断控制、状态查询和电量查询。设备配网和局域网自动发现暂不包含在 `1.0.0` 中。
+```text
+<项目目录>\.venv\Scripts\python.exe
+```
+
+并在该环境中重新安装：
+
+```powershell
+.\.venv\Scripts\python.exe -m pip install --upgrade geme-plug
+```
+
+### `Not authorized`
+
+MQTT 用户名或密码与 EMQX 不一致。检查：
+
+- `compose.yaml` 中的认证配置；
+- 插座自定义 MQTT 页面中的账号；
+- Python 代码中的 `username` 和 `password`。
+
+### `failed to connect to MQTT broker`
+
+依次检查：
+
+1. `docker compose ps` 中 EMQX 是否为 `Up`；
+2. Broker IP 和端口是否正确；
+3. Windows 防火墙是否允许 TCP 1883；
+4. Python 与插座是否能访问同一个 Broker。
+
+### `RequestTimeoutError`
+
+连接 Broker 成功但设备没有返回匹配响应。重点检查：
+
+1. 设备是否在线；
+2. SDK 发布主题是否等于设备订阅主题；
+3. SDK 订阅主题是否等于设备发布主题；
+4. MAC 地址是否正确。
+
+当前设备应显式设置：
+
+```python
+publish_topic="response"
+subscribe_topic="request"
+```
 
 ## License
 
