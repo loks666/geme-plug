@@ -97,30 +97,31 @@ python examples/turn_off.py \
 2. 配置为连接你的 MQTT Broker / EMQX；
 3. 配置与 SDK 一致的 MQTT Topic。
 
-`geme-plug` 默认使用规范化后的**小写 MAC**生成 Topic。Topic 名称从设备视角定义：
+`geme-plug` 默认使用规范化后的**小写 MAC**生成 Topic：
 
 ```text
-/geme/{mac}/subscribe
 /geme/{mac}/publish
+/geme/{mac}/subscribe
 ```
 
-- 设备订阅 `/subscribe`，接收 SDK 发出的控制指令；
-- 设备发布 `/publish`，SDK 从中接收状态和电量数据。
+- SDK 向 `/publish` 发布控制指令，设备实际订阅该主题；
+- SDK 订阅 `/subscribe`，设备通过该主题返回状态和电量数据。
 
 例如 MAC 为 `AA:BB:CC:DD:EE:FF`：
 
 ```text
-/geme/aabbccddeeff/subscribe
 /geme/aabbccddeeff/publish
+/geme/aabbccddeeff/subscribe
 ```
 
 在 GemeOpen 的“自定义 MQTT”页面中填写：
 
-- 订阅主题：`/geme/aabbccddeeff/subscribe`
-- 发布主题：`/geme/aabbccddeeff/publish`
+- 订阅主题：`/geme/aabbccddeeff/publish`
+- 发布主题：`/geme/aabbccddeeff/subscribe`
 
-SDK 的 `publish_topic` 是 SDK 发布指令的主题，因此对应设备的“订阅主题”；
-SDK 的 `subscribe_topic` 则对应设备的“发布主题”。
+以上方向已经通过 EMQX 的实时订阅记录和真机状态响应验证。设备配置页的字段名称
+容易与 SDK 视角混淆：SDK 的 `publish_topic` 对应设备实际订阅的控制主题，
+SDK 的 `subscribe_topic` 对应设备实际发布的响应主题。
 
 如果你已经给设备配置了其他 Topic，可以显式覆盖：
 
