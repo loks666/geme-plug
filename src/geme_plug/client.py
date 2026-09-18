@@ -60,8 +60,11 @@ class SmartPlug:
         self.password = password
         self.timeout = float(timeout)
 
-        self.publish_topic = publish_topic or f"/geme/{self.mac}/publish"
-        self.subscribe_topic = subscribe_topic or f"/geme/{self.mac}/subscribe"
+        # Topic names below are from the device's point of view: the device
+        # subscribes to commands and publishes responses. From the SDK's point
+        # of view those operations are necessarily reversed.
+        self.publish_topic = publish_topic or f"/geme/{self.mac}/subscribe"
+        self.subscribe_topic = subscribe_topic or f"/geme/{self.mac}/publish"
         self.client_id = client_id or f"geme-plug-{self.mac}-{uuid.uuid4().hex[:8]}"
 
         self._connected = threading.Event()

@@ -3,6 +3,28 @@ services:
     image: emqx/emqx:latest
     container_name: emqx
     restart: unless-stopped
+    environment:
+      EMQX_AUTHENTICATION__1__MECHANISM: password_based
+      EMQX_AUTHENTICATION__1__BACKEND: built_in_database
+      EMQX_AUTHENTICATION__1__USER_ID_TYPE: username
+      EMQX_AUTHENTICATION__1__PASSWORD_HASH_ALGORITHM__NAME: sha256
+      EMQX_AUTHENTICATION__1__PASSWORD_HASH_ALGORITHM__SALT_POSITION: suffix
+      EMQX_AUTHENTICATION__1__BOOTSTRAP_FILE: /opt/emqx/etc/auth-built-in-db-bootstrap.csv
+      EMQX_AUTHENTICATION__1__BOOTSTRAP_TYPE: plain
+    configs:
+      - source: emqx-auth-bootstrap
+        target: /opt/emqx/etc/auth-built-in-db-bootstrap.csv
+    volumes:
+      - emqx-data:/opt/emqx/data
     ports:
       - "1883:1883"
       - "18083:18083"
+
+configs:
+  emqx-auth-bootstrap:
+    content: |
+      user_id,password,is_superuser
+      ${MQTT_USERNAME:?set MQTT_USERNAME in .env},${MQTT_PASSWORD:?set MQTT_PASSWORD in .env},false
+
+volumes:
+  emqx-data:

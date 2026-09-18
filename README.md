@@ -43,15 +43,19 @@ with SmartPlug(host="192.168.31.100", mac="AA:BB:CC:DD:EE:FF") as plug:
 
 ## EMQX 认证
 
-EMQX 未开启 MQTT 客户端认证时，只需要 `host` 和 `mac`。
+仓库中的 Compose 配置默认启用 MQTT 客户端认证。首次启动前复制环境变量模板并设置强密码：
 
-开启认证后：
+```bash
+cp .env.example .env
+```
+
+`.env` 已被 Git 忽略，不要将实际密码提交到仓库。SDK 和设备配网页都要使用相同的账号：
 
 ```python
 plug = SmartPlug(
     host="192.168.31.100",
     mac="AABBCCDDEEFF",
-    username="geme",
+    username="geme-plug",
     password="your-password",
 )
 ```
@@ -60,7 +64,7 @@ plug = SmartPlug(
 
 ## 使用 Docker Compose 启动 EMQX
 
-仓库内置了与以下 `docker run` 配置等价的 `compose.yaml`：
+仓库内置了 EMQX Compose 配置，包含账号密码认证和持久化数据卷：
 
 ```bash
 docker compose up -d
@@ -93,21 +97,30 @@ python examples/turn_off.py \
 2. 配置为连接你的 MQTT Broker / EMQX；
 3. 配置与 SDK 一致的 MQTT Topic。
 
-`geme-plug` 默认使用规范化后的**小写 MAC**生成 Topic：
+`geme-plug` 默认使用规范化后的**小写 MAC**生成 Topic。Topic 名称从设备视角定义：
 
 ```text
-/geme/{mac}/publish
 /geme/{mac}/subscribe
+/geme/{mac}/publish
 ```
+
+- 设备订阅 `/subscribe`，接收 SDK 发出的控制指令；
+- 设备发布 `/publish`，SDK 从中接收状态和电量数据。
 
 例如 MAC 为 `AA:BB:CC:DD:EE:FF`：
 
 ```text
-/geme/aabbccddeeff/publish
 /geme/aabbccddeeff/subscribe
+/geme/aabbccddeeff/publish
 ```
 
-在 GemeOpen 的“自定义 MQTT”配置中，应让控制/发布主题和上报/订阅主题与这里保持一致。
+在 GemeOpen 的“自定义 MQTT”页面中填写：
+
+- 订阅主题：`/geme/aabbccddeeff/subscribe`
+- 发布主题：`/geme/aabbccddeeff/publish`
+
+SDK 的 `publish_topic` 是 SDK 发布指令的主题，因此对应设备的“订阅主题”；
+SDK 的 `subscribe_topic` 则对应设备的“发布主题”。
 
 如果你已经给设备配置了其他 Topic，可以显式覆盖：
 
