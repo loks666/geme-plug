@@ -24,7 +24,7 @@ configs:
   emqx-auth-bootstrap:
     content: |
       user_id,password,is_superuser
-      ${MQTT_USERNAME:?set MQTT_USERNAME in .env},${MQTT_PASSWORD:?set MQTT_PASSWORD in .env},false
+      geme-plug,x7Tq9V2mK8rP4nD6sH3wF5cJ1bL0zQeA,false
 
 volumes:
   emqx-data:

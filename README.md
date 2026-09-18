@@ -43,20 +43,21 @@ with SmartPlug(host="192.168.31.100", mac="AA:BB:CC:DD:EE:FF") as plug:
 
 ## EMQX 认证
 
-仓库中的 Compose 配置默认启用 MQTT 客户端认证。首次启动前复制环境变量模板并设置强密码：
+仓库中的 Compose 配置默认启用 MQTT 客户端认证，并内置以下局域网设备账号：
 
-```bash
-cp .env.example .env
+```text
+用户名：geme-plug
+密码：x7Tq9V2mK8rP4nD6sH3wF5cJ1bL0zQeA
 ```
 
-`.env` 已被 Git 忽略，不要将实际密码提交到仓库。SDK 和设备配网页都要使用相同的账号：
+SDK 和设备配网页都要使用相同的账号：
 
 ```python
 plug = SmartPlug(
     host="192.168.31.100",
     mac="AABBCCDDEEFF",
     username="geme-plug",
-    password="your-password",
+    password="x7Tq9V2mK8rP4nD6sH3wF5cJ1bL0zQeA",
 )
 ```
 
