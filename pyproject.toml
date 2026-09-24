@@ -30,6 +30,13 @@ dependencies = [
   "python-dotenv>=1.0,<2",
 ]
 
+[dependency-groups]
+dev = [
+  "ipykernel>=6.29,<7",
+  "pytest>=8,<9",
+  "python-dotenv>=1.0,<2",
+]
+
 [project.urls]
 Homepage = "https://github.com/loks666/geme-plug"
 Repository = "https://github.com/loks666/geme-plug"
