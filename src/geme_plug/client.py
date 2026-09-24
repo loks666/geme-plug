@@ -1,17 +1,36 @@
 from __future__ import annotations
 
 import json
+import os
 import re
 import threading
 import uuid
+from pathlib import Path
 from typing import Any
 
 import paho.mqtt.client as mqtt
+from dotenv import dotenv_values
 
 from .exceptions import ConnectionError, ProtocolError, RequestTimeoutError
 from .models import PlugStatus, PowerStatus
 
 _MAC_RE = re.compile(r"^[0-9a-f]{12}$")
+
+
+def _setting(
+    explicit: Any,
+    environ_name: str,
+    file_values: dict[str, str | None],
+    default: Any = None,
+) -> Any:
+    """Resolve a setting using explicit > process environment > .env > default."""
+    if explicit is not None:
+        return explicit
+    if environ_name in os.environ:
+        return os.environ[environ_name]
+    if environ_name in file_values and file_values[environ_name] is not None:
+        return file_values[environ_name]
+    return default
 
 
 def normalize_mac(mac: str) -> str:
@@ -34,36 +53,67 @@ class SmartPlug:
 
     def __init__(
         self,
-        host: str,
-        mac: str,
-        port: int = 1883,
+        host: str | None = None,
+        mac: str | None = None,
+        port: int | None = None,
         username: str | None = None,
         password: str | None = None,
-        timeout: float = 5.0,
+        timeout: float | None = None,
         publish_topic: str | None = None,
         subscribe_topic: str | None = None,
         client_id: str | None = None,
+        env_file: str | Path | None = ".env",
     ) -> None:
-        if not host or not host.strip():
-            raise ValueError("host cannot be empty")
+        file_values = dict(dotenv_values(env_file)) if env_file is not None else {}
+        host = _setting(host, "GEME_PLUG_HOST", file_values)
+        mac = _setting(mac, "GEME_PLUG_MAC", file_values)
+        port = _setting(port, "GEME_PLUG_PORT", file_values, 1883)
+        username = _setting(username, "GEME_PLUG_USERNAME", file_values)
+        password = _setting(password, "GEME_PLUG_PASSWORD", file_values)
+        timeout = _setting(timeout, "GEME_PLUG_TIMEOUT", file_values, 5.0)
+        publish_topic = _setting(
+            publish_topic, "GEME_PLUG_PUBLISH_TOPIC", file_values, "request"
+        )
+        subscribe_topic = _setting(
+            subscribe_topic, "GEME_PLUG_SUBSCRIBE_TOPIC", file_values, "response"
+        )
+        client_id = _setting(client_id, "GEME_PLUG_CLIENT_ID", file_values)
+
+        if host is None or not str(host).strip():
+            raise ValueError("host cannot be empty; pass host or set GEME_PLUG_HOST")
+        if mac is None or not str(mac).strip():
+            raise ValueError("mac cannot be empty; pass mac or set GEME_PLUG_MAC")
+        try:
+            port = int(port)
+        except (TypeError, ValueError) as exc:
+            raise ValueError("port must be an integer") from exc
+        try:
+            timeout = float(timeout)
+        except (TypeError, ValueError) as exc:
+            raise ValueError("timeout must be a number") from exc
+
         if port <= 0 or port > 65535:
             raise ValueError("port must be between 1 and 65535")
         if timeout <= 0:
             raise ValueError("timeout must be greater than 0")
         if password is not None and username is None:
             raise ValueError("username is required when password is provided")
+        if not str(publish_topic).strip():
+            raise ValueError("publish_topic cannot be empty")
+        if not str(subscribe_topic).strip():
+            raise ValueError("subscribe_topic cannot be empty")
 
-        self.host = host.strip()
-        self.port = int(port)
-        self.mac = normalize_mac(mac)
+        self.host = str(host).strip()
+        self.port = port
+        self.mac = normalize_mac(str(mac))
         self.username = username
         self.password = password
-        self.timeout = float(timeout)
+        self.timeout = timeout
 
         # The SDK publishes commands to the topic subscribed to by the device,
         # and subscribes to the topic used by the device for responses.
-        self.publish_topic = publish_topic or "request"
-        self.subscribe_topic = subscribe_topic or "response"
+        self.publish_topic = str(publish_topic).strip()
+        self.subscribe_topic = str(subscribe_topic).strip()
         self.client_id = client_id or f"geme-plug-{self.mac}-{uuid.uuid4().hex[:8]}"
 
         self._connected = threading.Event()
@@ -107,7 +157,11 @@ class SmartPlug:
                 self._client.disconnect()
             except Exception:
                 pass
-            detail = f": {self._connect_error}" if self._connect_error else ""
+            detail = (
+                f": {self._connect_error}"
+                if self._connect_error
+                else f": no MQTT CONNACK within {self.timeout:g}s"
+            )
             raise ConnectionError(
                 f"failed to connect to MQTT broker {self.host}:{self.port}{detail}"
             )

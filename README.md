@@ -7,6 +7,7 @@
 - 查询电压、电流、功率和累计电量；
 - 连接启用账号认证的 EMQX 等 MQTT Broker；
 - 自定义 MQTT 发布和订阅主题。
+- 默认从 `.env` 读取配置，并允许构造函数参数覆盖。
 
 > 本项目是第三方开源 SDK，与 GemeOpen 或设备厂商没有隶属关系。
 
@@ -39,35 +40,52 @@ python -c "import geme_plug; print(geme_plug.__version__)"
 .\.venv\Scripts\python.exe -m pip install geme-plug
 ```
 
-### 第三步：确认连接参数
+### 第三步：配置插座网页
 
-运行代码前需要准备：
+在插座的自定义 MQTT 页面填写：
 
-- EMQX 的 IP 和 MQTT 端口；
-- MQTT 用户名和密码；
-- 插座 MAC 地址；
-- 设备实际使用的发布和订阅主题。
+| 网页字段 | 填写内容 |
+| --- | --- |
+| Broker / Server / Host | EMQX 所在电脑的局域网 IP，例如 `192.168.50.70` |
+| Port | `1883` |
+| Username | EMQX 分配的 MQTT 用户名 |
+| Password | 对应的 MQTT 密码 |
 
-SDK 与 EMQX 在同一台电脑上运行时，`host` 使用 `127.0.0.1`。SDK 在其他电脑运行时，`host` 使用 EMQX 所在电脑的局域网 IP。
+不要在 Broker 字段中填写 `mqtt://`，也不要把端口拼在 IP 后面。`1883` 是普通 MQTT over TCP；如果网页另有 SSL/TLS 开关，应保持关闭。保存后让插座重启并重新联网。
 
-当前已测试设备的主题方向是：SDK 向 `response` 发布命令，从 `request` 接收设备数据。
+只有这四项也可以配置该型号：设备 Client ID 和主题由固件处理。当前已测试设备订阅 `response`、发布 `request`。插座仍需先完成 Wi-Fi 配网，并能访问 Broker 的 TCP `1883` 端口。
 
-### 第四步：创建测试文件
+### 第四步：创建 `.env`
+
+在运行 Python 的目录中新建 `.env`：
+
+```dotenv
+GEME_PLUG_HOST=192.168.50.70
+GEME_PLUG_PORT=1883
+GEME_PLUG_USERNAME=<MQTT_USERNAME>
+GEME_PLUG_PASSWORD=<MQTT_PASSWORD>
+GEME_PLUG_MAC=<PLUG_MAC_ADDRESS>
+GEME_PLUG_PUBLISH_TOPIC=response
+GEME_PLUG_SUBSCRIBE_TOPIC=request
+GEME_PLUG_TIMEOUT=10
+```
+
+仓库用户也可以复制 `.env.example` 后再修改：
+
+```powershell
+Copy-Item .env.example .env
+```
+
+`.env` 已被 Git 忽略，不要提交账号密码。MAC 地址可从插座标签或配置网页获取。
+
+### 第五步：创建测试文件
 
 新建 `test_plug.py`：
 
 ```python
 from geme_plug import SmartPlug
 
-plug = SmartPlug(
-    host="127.0.0.1",               # 或 EMQX 所在电脑的局域网 IP
-    port=1883,
-    username="<MQTT_USERNAME>",
-    password="<MQTT_PASSWORD>",
-    mac="8CCE4E51ACAB",
-    publish_topic="response",       # SDK -> 设备
-    subscribe_topic="request",      # 设备 -> SDK
-)
+plug = SmartPlug()  # 默认读取当前目录的 .env
 
 plug.connect()
 
@@ -82,7 +100,7 @@ finally:
     plug.disconnect()
 ```
 
-### 第五步：运行
+### 第六步：运行
 
 ```powershell
 python .\test_plug.py
@@ -133,6 +151,12 @@ python -m pip install --upgrade pip
 python -m pip install --upgrade geme-plug
 ```
 
+若要立即使用仓库中尚未发布的最新代码（包括 `.env` 默认配置），请在仓库根目录安装：
+
+```powershell
+python -m pip install -e .
+```
+
 不激活虚拟环境时：
 
 ```powershell
@@ -177,11 +201,11 @@ docker compose logs --tail 100 emqx
 
 ## 5. MQTT 账号和主题
 
-SDK 与插座必须使用同一个 Broker、端口和 MQTT 账号。账号密码以 `compose.yaml` 中的实际配置为准：
+SDK 与插座必须使用同一个 Broker、端口和 MQTT 账号。建议统一写在本地 `.env`：
 
-```python
-username="<MQTT_USERNAME>"
-password="<MQTT_PASSWORD>"
+```dotenv
+GEME_PLUG_USERNAME=<MQTT_USERNAME>
+GEME_PLUG_PASSWORD=<MQTT_PASSWORD>
 ```
 
 当前设备 `8CCE4E51ACAB` 已实测使用以下主题方向：
@@ -193,11 +217,11 @@ password="<MQTT_PASSWORD>"
 | 设备订阅命令 | `response` |
 | 设备发布数据 | `request` |
 
-因此，在当前环境中必须显式传入：
+因此，在当前环境的 `.env` 中应设置：
 
-```python
-publish_topic="response"
-subscribe_topic="request"
+```dotenv
+GEME_PLUG_PUBLISH_TOPIC=response
+GEME_PLUG_SUBSCRIBE_TOPIC=request
 ```
 
 `publish_topic` 和 `subscribe_topic` 始终从 SDK 视角命名：
@@ -213,20 +237,12 @@ docker exec emqx emqx ctl subscriptions list
 
 ## 6. 当前环境完整示例
 
-将账号和密码替换为 `compose.yaml` 中的值：
+准备好 `.env` 后，无需在代码中重复账号、密码和 MAC：
 
 ```python
 from geme_plug import SmartPlug
 
-plug = SmartPlug(
-    host="127.0.0.1",
-    port=1883,
-    username="<MQTT_USERNAME>",
-    password="<MQTT_PASSWORD>",
-    mac="8CCE4E51ACAB",
-    publish_topic="response",
-    subscribe_topic="request",
-)
+plug = SmartPlug()
 
 plug.connect()
 
@@ -255,15 +271,7 @@ finally:
 ```python
 from geme_plug import SmartPlug
 
-plug = SmartPlug(
-    host="127.0.0.1",
-    port=1883,
-    username="<MQTT_USERNAME>",
-    password="<MQTT_PASSWORD>",
-    mac="8CCE4E51ACAB",
-    publish_topic="response",
-    subscribe_topic="request",
-)
+plug = SmartPlug()
 
 plug.connect()
 
@@ -280,7 +288,7 @@ finally:
 
 ## 8. 使用 Jupyter Notebook 测试
 
-仓库中的 `test_switch.ipynb` 已按当前环境配置好连接、开关、状态和功率测试。
+仓库中的 `test_switch.ipynb` 默认读取项目根目录 `.env`，并已配置好连接、开关、状态和功率测试。
 
 在 VS Code 或其他支持 Notebook 的 IDE 中：
 
@@ -300,17 +308,26 @@ finally:
 
 ```python
 SmartPlug(
-    host: str,
-    mac: str,
-    port: int = 1883,
+    host: str | None = None,
+    mac: str | None = None,
+    port: int | None = None,
     username: str | None = None,
     password: str | None = None,
-    timeout: float = 5.0,
+    timeout: float | None = None,
     publish_topic: str | None = None,
     subscribe_topic: str | None = None,
     client_id: str | None = None,
+    env_file: str | Path | None = ".env",
 )
 ```
+
+配置优先级为：构造函数显式参数 > 系统环境变量 > `.env` > SDK 内置默认值。比如只临时覆盖 Broker：
+
+```python
+plug = SmartPlug(host="192.168.50.71")
+```
+
+支持的环境变量：`GEME_PLUG_HOST`、`GEME_PLUG_PORT`、`GEME_PLUG_USERNAME`、`GEME_PLUG_PASSWORD`、`GEME_PLUG_MAC`、`GEME_PLUG_TIMEOUT`、`GEME_PLUG_PUBLISH_TOPIC`、`GEME_PLUG_SUBSCRIBE_TOPIC`、`GEME_PLUG_CLIENT_ID`。
 
 MAC 地址支持以下格式：
 
@@ -371,7 +388,7 @@ print(power.energy)
 
 MQTT 用户名或密码与 EMQX 不一致。检查：
 
-- `compose.yaml` 中的认证配置；
+- `.env` 或系统环境变量中的认证配置；
 - 插座自定义 MQTT 页面中的账号；
 - Python 代码中的 `username` 和 `password`。
 
@@ -393,11 +410,11 @@ MQTT 用户名或密码与 EMQX 不一致。检查：
 3. SDK 订阅主题是否等于设备发布主题；
 4. MAC 地址是否正确。
 
-当前设备应显式设置：
+当前设备的 `.env` 应设置：
 
-```python
-publish_topic="response"
-subscribe_topic="request"
+```dotenv
+GEME_PLUG_PUBLISH_TOPIC=response
+GEME_PLUG_SUBSCRIBE_TOPIC=request
 ```
 
 ## License

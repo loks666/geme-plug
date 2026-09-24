@@ -3,18 +3,20 @@
 from __future__ import annotations
 
 import argparse
+from pathlib import Path
 
 from geme_plug import RequestTimeoutError, SmartPlug
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--host", default="127.0.0.1", help="MQTT broker host")
-    parser.add_argument("--port", type=int, default=1883, help="MQTT broker port")
-    parser.add_argument("--mac", required=True, help="Plug MAC address")
-    parser.add_argument("--timeout", type=float, default=10.0, help="Response timeout")
+    parser.add_argument("--host", help="MQTT broker host; overrides .env")
+    parser.add_argument("--port", type=int, help="MQTT broker port; overrides .env")
+    parser.add_argument("--mac", help="Plug MAC address; overrides .env")
+    parser.add_argument("--timeout", type=float, help="Response timeout; overrides .env")
     parser.add_argument("--username")
     parser.add_argument("--password")
+    parser.add_argument("--env-file", type=Path, default=Path(".env"))
     return parser.parse_args()
 
 
@@ -27,6 +29,7 @@ def main() -> None:
         timeout=args.timeout,
         username=args.username,
         password=args.password,
+        env_file=args.env_file,
     ) as plug:
         try:
             before = plug.get_status()
