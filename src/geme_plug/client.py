@@ -72,10 +72,10 @@ class SmartPlug:
         password = _setting(password, "GEME_PLUG_PASSWORD", file_values)
         timeout = _setting(timeout, "GEME_PLUG_TIMEOUT", file_values, 5.0)
         publish_topic = _setting(
-            publish_topic, "GEME_PLUG_PUBLISH_TOPIC", file_values, "request"
+            publish_topic, "GEME_PLUG_PUBLISH_TOPIC", file_values, "response"
         )
         subscribe_topic = _setting(
-            subscribe_topic, "GEME_PLUG_SUBSCRIBE_TOPIC", file_values, "response"
+            subscribe_topic, "GEME_PLUG_SUBSCRIBE_TOPIC", file_values, "request"
         )
         client_id = _setting(client_id, "GEME_PLUG_CLIENT_ID", file_values)
 
@@ -111,13 +111,16 @@ class SmartPlug:
         self.timeout = timeout
 
         # The SDK publishes commands to the topic subscribed to by the device,
-        # and subscribes to the topic used by the device for responses.
+        # and subscribes to the topic used by the device for responses. This
+        # GSPM1B responds when commands are sent to `response` and sends
+        # its replies on `request`, despite the labels shown in its web UI.
         self.publish_topic = str(publish_topic).strip()
         self.subscribe_topic = str(subscribe_topic).strip()
         self.client_id = client_id or f"geme-plug-{self.mac}-{uuid.uuid4().hex[:8]}"
 
         self._connected = threading.Event()
         self._connect_error: str | None = None
+        self._subscription_mid: int | None = None
         self._pending: dict[str, tuple[threading.Event, dict[str, Any] | None]] = {}
         self._pending_lock = threading.Lock()
 
@@ -130,6 +133,7 @@ class SmartPlug:
             self._client.username_pw_set(self.username, self.password)
 
         self._client.on_connect = self._on_connect
+        self._client.on_subscribe = self._on_subscribe
         self._client.on_disconnect = self._on_disconnect
         self._client.on_message = self._on_message
 
@@ -249,9 +253,25 @@ class SmartPlug:
         if reason_code.is_failure:
             self._connect_error = str(reason_code)
             return
-        result, _ = client.subscribe(self.subscribe_topic, qos=0)
+        result, message_id = client.subscribe(self.subscribe_topic, qos=0)
         if result != mqtt.MQTT_ERR_SUCCESS:
             self._connect_error = f"subscribe failed with rc={result}"
+            return
+        self._subscription_mid = message_id
+
+    def _on_subscribe(
+        self,
+        client: mqtt.Client,
+        userdata: Any,
+        message_id: int,
+        reason_code_list: list[mqtt.ReasonCode],
+        properties: mqtt.Properties | None,
+    ) -> None:
+        if message_id != self._subscription_mid:
+            return
+        failures = [str(code) for code in reason_code_list if code.is_failure]
+        if failures:
+            self._connect_error = f"subscribe rejected: {', '.join(failures)}"
             return
         self._connected.set()
 
@@ -264,6 +284,7 @@ class SmartPlug:
         properties: mqtt.Properties | None,
     ) -> None:
         self._connected.clear()
+        self._subscription_mid = None
 
     def _on_message(self, client: mqtt.Client, userdata: Any, message: mqtt.MQTTMessage) -> None:
         try:

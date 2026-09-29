@@ -46,14 +46,17 @@ python -c "import geme_plug; print(geme_plug.__version__)"
 
 | 网页字段 | 填写内容 |
 | --- | --- |
-| Broker / Server / Host | EMQX 所在电脑的局域网 IP，例如 `192.168.50.70` |
+| Broker / Server / Host | EMQX 所在电脑的局域网 IP；当前环境为 `192.168.50.70` |
 | Port | `1883` |
 | Username | EMQX 分配的 MQTT 用户名 |
 | Password | 对应的 MQTT 密码 |
+| Client ID | `geme-plug-8cce4e51acab` |
+| Subscribe Topic / 订阅主题 | `request` |
+| Publish Topic / 发布主题 | `response` |
 
 不要在 Broker 字段中填写 `mqtt://`，也不要把端口拼在 IP 后面。`1883` 是普通 MQTT over TCP；如果网页另有 SSL/TLS 开关，应保持关闭。保存后让插座重启并重新联网。
 
-只有这四项也可以配置该型号：设备 Client ID 和主题由固件处理。当前已测试设备订阅 `response`、发布 `request`。插座仍需先完成 Wi-Fi 配网，并能访问 Broker 的 TCP `1883` 端口。
+当前插座网页填写订阅 `request`、发布 `response`。真机 MQTT 查询证实：SDK 发布到 `response`、订阅 `request` 才能收到设备状态。网页字段的命名不能直接当作设备实际收发方向。设备 Client ID 必须保持唯一；SDK 默认会在 MAC 后追加随机后缀，不会与该设备 Client ID 冲突。插座仍需先完成 Wi-Fi 配网，并能访问 Broker 的 TCP `1883` 端口。
 
 ### 第四步：创建 `.env`
 
@@ -62,7 +65,7 @@ python -c "import geme_plug; print(geme_plug.__version__)"
 ```dotenv
 GEME_PLUG_HOST=192.168.50.70
 GEME_PLUG_PORT=1883
-GEME_PLUG_USERNAME=<MQTT_USERNAME>
+GEME_PLUG_USERNAME=emqx_test
 GEME_PLUG_PASSWORD=<MQTT_PASSWORD>
 GEME_PLUG_MAC=<PLUG_MAC_ADDRESS>
 GEME_PLUG_PUBLISH_TOPIC=response
@@ -214,8 +217,8 @@ GEME_PLUG_PASSWORD=<MQTT_PASSWORD>
 | --- | --- |
 | SDK 发布命令 | `response` |
 | SDK 订阅设备数据 | `request` |
-| 设备订阅命令 | `response` |
-| 设备发布数据 | `request` |
+| 设备实际接收命令 | `response` |
+| 设备实际返回数据 | `request` |
 
 因此，在当前环境的 `.env` 中应设置：
 

@@ -9,3 +9,4 @@ build/
 .env
 info.txt
 .idea/
+.vscode/

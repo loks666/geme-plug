@@ -21,8 +21,8 @@ def test_normalize_mac_rejects_invalid(value):
 
 def test_default_topics():
     plug = SmartPlug(host="127.0.0.1", mac="AA:BB:CC:DD:EE:FF", env_file=None)
-    assert plug.publish_topic == "request"
-    assert plug.subscribe_topic == "response"
+    assert plug.publish_topic == "response"
+    assert plug.subscribe_topic == "request"
 
 
 def test_custom_topics():
@@ -35,6 +35,36 @@ def test_custom_topics():
     )
     assert plug.publish_topic == "custom/command"
     assert plug.subscribe_topic == "custom/state"
+
+
+class _SubscribeReason:
+    def __init__(self, value: str, is_failure: bool = False):
+        self.value = value
+        self.is_failure = is_failure
+
+    def __str__(self):
+        return self.value
+
+
+def test_connection_becomes_ready_only_after_subscription_acknowledgement():
+    plug = SmartPlug(host="127.0.0.1", mac="AABBCCDDEEFF", env_file=None)
+    plug._subscription_mid = 7
+
+    plug._on_subscribe(None, None, 6, [_SubscribeReason("Granted QoS 0")], None)
+    assert not plug._connected.is_set()
+
+    plug._on_subscribe(None, None, 7, [_SubscribeReason("Granted QoS 0")], None)
+    assert plug._connected.is_set()
+
+
+def test_subscription_rejection_does_not_mark_connection_ready():
+    plug = SmartPlug(host="127.0.0.1", mac="AABBCCDDEEFF", env_file=None)
+    plug._subscription_mid = 7
+
+    plug._on_subscribe(None, None, 7, [_SubscribeReason("Not authorized", True)], None)
+
+    assert not plug._connected.is_set()
+    assert plug._connect_error == "subscribe rejected: Not authorized"
 
 
 def test_reads_defaults_from_env_file(tmp_path):
@@ -207,3 +237,4 @@ def test_request_response_flow():
     assert status.device_type == "Socket-mini"
     assert status.ip == "192.168.31.9"
     assert power.power == pytest.approx(110.0)
+    assert [topic for topic, _ in plug._client.published] == ["response", "response"]
