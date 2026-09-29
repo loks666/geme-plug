@@ -125,8 +125,8 @@ class SmartPlug:
         self._pending_lock = threading.Lock()
 
         self._client = mqtt.Client(
-            callback_api_version=mqtt.CallbackAPIVersion.VERSION2,
             client_id=self.client_id,
+            clean_session=True,
             protocol=mqtt.MQTTv311,
         )
         if self.username is not None:
@@ -246,12 +246,11 @@ class SmartPlug:
         self,
         client: mqtt.Client,
         userdata: Any,
-        flags: mqtt.ConnectFlags,
-        reason_code: mqtt.ReasonCode,
-        properties: mqtt.Properties | None,
+        flags: dict[str, int],
+        result_code: int,
     ) -> None:
-        if reason_code.is_failure:
-            self._connect_error = str(reason_code)
+        if result_code != mqtt.MQTT_ERR_SUCCESS:
+            self._connect_error = mqtt.connack_string(result_code)
             return
         result, message_id = client.subscribe(self.subscribe_topic, qos=0)
         if result != mqtt.MQTT_ERR_SUCCESS:
@@ -264,14 +263,12 @@ class SmartPlug:
         client: mqtt.Client,
         userdata: Any,
         message_id: int,
-        reason_code_list: list[mqtt.ReasonCode],
-        properties: mqtt.Properties | None,
+        granted_qos: list[int],
     ) -> None:
         if message_id != self._subscription_mid:
             return
-        failures = [str(code) for code in reason_code_list if code.is_failure]
-        if failures:
-            self._connect_error = f"subscribe rejected: {', '.join(failures)}"
+        if any(qos == 0x80 for qos in granted_qos):
+            self._connect_error = "subscribe rejected by MQTT broker"
             return
         self._connected.set()
 
@@ -279,9 +276,7 @@ class SmartPlug:
         self,
         client: mqtt.Client,
         userdata: Any,
-        disconnect_flags: mqtt.DisconnectFlags,
-        reason_code: mqtt.ReasonCode,
-        properties: mqtt.Properties | None,
+        result_code: int,
     ) -> None:
         self._connected.clear()
         self._subscription_mid = None

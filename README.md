@@ -120,6 +120,7 @@ python .\test_plug.py
 ## 1. 环境要求
 
 - Python 3.10 或更高版本；
+- `paho-mqtt==1.6.1`；
 - 可用的 MQTT Broker，例如 EMQX；
 - 插座与运行 SDK 的电脑能够访问同一个 Broker；
 - 插座已经完成 Wi-Fi 和自定义 MQTT 配置。

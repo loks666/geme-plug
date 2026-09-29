@@ -37,23 +37,14 @@ def test_custom_topics():
     assert plug.subscribe_topic == "custom/state"
 
 
-class _SubscribeReason:
-    def __init__(self, value: str, is_failure: bool = False):
-        self.value = value
-        self.is_failure = is_failure
-
-    def __str__(self):
-        return self.value
-
-
 def test_connection_becomes_ready_only_after_subscription_acknowledgement():
     plug = SmartPlug(host="127.0.0.1", mac="AABBCCDDEEFF", env_file=None)
     plug._subscription_mid = 7
 
-    plug._on_subscribe(None, None, 6, [_SubscribeReason("Granted QoS 0")], None)
+    plug._on_subscribe(None, None, 6, [0])
     assert not plug._connected.is_set()
 
-    plug._on_subscribe(None, None, 7, [_SubscribeReason("Granted QoS 0")], None)
+    plug._on_subscribe(None, None, 7, [0])
     assert plug._connected.is_set()
 
 
@@ -61,10 +52,10 @@ def test_subscription_rejection_does_not_mark_connection_ready():
     plug = SmartPlug(host="127.0.0.1", mac="AABBCCDDEEFF", env_file=None)
     plug._subscription_mid = 7
 
-    plug._on_subscribe(None, None, 7, [_SubscribeReason("Not authorized", True)], None)
+    plug._on_subscribe(None, None, 7, [0x80])
 
     assert not plug._connected.is_set()
-    assert plug._connect_error == "subscribe rejected: Not authorized"
+    assert plug._connect_error == "subscribe rejected by MQTT broker"
 
 
 def test_reads_defaults_from_env_file(tmp_path):
